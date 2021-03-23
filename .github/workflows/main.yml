@@ -20,18 +20,18 @@ on:
     - main
 
 env:
-  AZURE_WEBAPP_NAME: aatiwarishub-linux-netcore
+  AZURE_WEBAPP_NAME: aatiwarishub-windows-dotnet
   AZURE_WEBAPP_SLOT_NAME: staging  
   AZURE_WEBAPP_PACKAGE_PATH: ./TodoApi.Swashbuckle/published
   AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.WEBAPPLINUX_FFFF }}
   AZURE_APIM_SERVICE_PRINCIPAL: ${{ secrets.APIMANAGEMENTSERVICE_SERVICE_PRINCIPAL }}
-  AZURE_APIM_RESOURCE_PATH: /tiwarishubAPIMInstance/v1
+  AZURE_APIM_RESOURCE_PATH: /aatiwarishub-apim/v1
   AZURE_APIM_RESOURCEGROUP: aatiwarishub-rg
-  AZURE_APIM_SERVICENAME: tiwarishubAPIMInstance
+  AZURE_APIM_SERVICENAME: aatiwarishub-apim
   AZURE_APIM_API_ID: myAPIInstance
-  AZURE_APIM_APPSERVICEURL: https://aatiwarishub-linux-netcore.azurewebsites.net   ## webappname , can it be customized
-  SWASHBUCLE_ASPNET_CORE_CLI_PACKAGE_VERSION: 6.0.7  ### is these variables can be automated
-  SWASHBUCKLE_DOTNET_CORE_VERSION: 5.0.x   ## is this can be automated
+  AZURE_APIM_APPSERVICEURL: https://aatiwarishub-windows-dotnet.azurewebsites.net   ## webappname , can it be customized
+  SWASHBUCLE_ASPNET_CORE_CLI_PACKAGE_VERSION: 5.6.3  ### is these variables can be automated
+  SWASHBUCKLE_DOTNET_CORE_VERSION: 3.1.x   ## is this can be automated
   API_IMPORT_SPECIFICATION_PATH: ./TodoApi.Swashbuckle/published/swagger.json  ##  swagger path, is it mandatory 
   API_IMPORT_DLL: ./TodoApi.Swashbuckle/bin/Release/netcoreapp3.1/TodoApi.dll  ## Repo analysis, we 
   API_IMPORT_VERSION: v1
@@ -68,9 +68,30 @@ jobs:
     - name: Publish
       run: dotnet publish ${{ env.WORKING_DIRECTORY }} --configuration ${{ env.CONFIGURATION }} --no-build --output ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
 
+    - name: Deploy to Azure WebApp
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+        publish-profile: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE }}
+       # slot-name: ${{ env.AZURE_WEBAPP_SLOT_NAME }}
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ env.AZURE_APIM_SERVICE_PRINCIPAL }}
 
     - name: Install Swashbuckle CLI .NET Global Tool
       run: dotnet tool install --global Swashbuckle.AspNetCore.Cli --version ${{ env.SWASHBUCLE_ASPNET_CORE_CLI_PACKAGE_VERSION }}
 
     - name: Generate Open API Specification Document
       run: swagger tofile --output "${{ env.API_IMPORT_SPECIFICATION_PATH }}" "${{ env.API_IMPORT_DLL }}" ${{ env.API_IMPORT_VERSION }}
+
+    - name: Import API into Azure API Management
+      run: az apim api import --path "${{ env.AZURE_APIM_RESOURCE_PATH }}" --resource-group ${{ env.AZURE_APIM_RESOURCEGROUP }} --service-name ${{ env.AZURE_APIM_SERVICENAME }} --api-id ${{ env.AZURE_APIM_API_ID }} --service-url "${{ env.AZURE_APIM_APPSERVICEURL }}" --specification-path "${{ env.API_IMPORT_SPECIFICATION_PATH }}" --specification-format OpenApi --subscription-required false
+
+    - name: Publish Artifacts
+      uses: actions/upload-artifact@v1.0.0
+      with:
+        name: webapp
+        path: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
