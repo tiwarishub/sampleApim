@@ -2,7 +2,7 @@ name: Build and deploy .NET Core app to Windows WebApp aatiwarishub-window-dotne
 on:
   push:
     branches:
-    - master
+    - main
 
 env:
   AZURE_WEBAPP_NAME: aatiwarishub-window-dotnet
